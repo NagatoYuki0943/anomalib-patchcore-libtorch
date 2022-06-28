@@ -12,7 +12,7 @@ using namespace std;
 
 
 /**
- * ¶ÁÈ¡Í¼Ïñ²¢Ô¤´¦Àí
+ * è¯»å–å›¾åƒå¹¶é¢„å¤„ç†
  */
 cv::Mat readImage(String path) {
 	cv::Mat image = cv::imread(path);				// BGR
@@ -21,42 +21,41 @@ cv::Mat readImage(String path) {
 
 
 /**
- * Í¼Æ¬Ô¤´¦Àí
+ * å›¾ç‰‡é¢„å¤„ç†
  */
 torch::Tensor preProcess(cv::Mat image, MetaData& meta) {
 	int height = image.rows;
 	int width = image.cols;
-	//±£´æÔ­Í¼ĞÅÏ¢
+	//ä¿å­˜åŸå›¾ä¿¡æ¯
 	meta.height = height;
 	meta.width = width;
 
 	cv::Mat image1;
 	cv::cvtColor(image, image1, cv::COLOR_BGR2RGB);	// BGR2RGB
 
-	//Ëõ·Å
+	//ç¼©æ”¾
 	cv::Mat res = Resize(image1, meta.pred_image_size, meta.pred_image_size, "bilinear");
 
-	//¹éÒ»»¯
+	//å½’ä¸€åŒ–
 	res = Divide(res);
 
-	//×ª»¯Îªtensor
+	//è½¬åŒ–ä¸ºtensor
 	torch::Tensor x = torch::from_blob(res.data, { 1, res.rows, res.cols, 3 });
 	x = x.permute({ 0, 3, 1, 2 });
 	//x = x.div(torch::full({ 1, 3, 512, 512 }, 255.0));
 
-	//±ê×¼»¯
-	vector<double> mean = vector<double>{ 0.485, 0.456, 0.406 };
-	vector<double> std = vector<double>{ 0.229, 0.224, 0.225 };
+	//æ ‡å‡†åŒ–
+	auto mean = vector<double>{ 0.485, 0.456, 0.406 };
+	auto std  = vector<double>{ 0.229, 0.224, 0.225 };
 	x = torch::data::transforms::Normalize<>(mean, std)(x);
-	cout << "sum:" << x.sum() << endl;  //-853865
-	cout << x.size(0) << ", " << x.size(1) << ", " << x.size(2) << ", " << x.size(3) << endl; // 1, 3, 512, 512
+	//cout << x.size(0) << ", " << x.size(1) << ", " << x.size(2) << ", " << x.size(3) << endl; // 1, 3, 512, 512
 	//cout << x << endl;
 	return x;
 }
 
 
 /**
- * ¶ÁÈ¡Ä£ĞÍ
+ * è¯»å–æ¨¡å‹
  */
 torch::jit::Module loadTorchScript(String path) {
 	torch::jit::Module model = torch::jit::load(path);
@@ -65,24 +64,24 @@ torch::jit::Module loadTorchScript(String path) {
 
 
 /**
- * ·Ö±ğ±ê×¼»¯ÈÈÁ¦Í¼ºÍµÃ·Ö
+ * åˆ†åˆ«æ ‡å‡†åŒ–çƒ­åŠ›å›¾å’Œå¾—åˆ†
  */
 torch::Tensor normalize(torch::Tensor& targets, double threshold, double max_val, double min_val) {
 	auto normalized = ((targets - threshold) / (max_val - min_val)) + 0.5;
-	normalized = torch::minimum(normalized, torch::tensor(1));
-	normalized = torch::maximum(normalized, torch::tensor(0));
+	normalized	    = torch::minimum(normalized, torch::tensor(1));
+	normalized		= torch::maximum(normalized, torch::tensor(0));
 	return normalized;
 }
 
 
 /**
- * ºó´¦Àí²¿·Ö
+ * åå¤„ç†éƒ¨åˆ†
  */
 void postProcess(torch::Tensor& anomaly_map, torch::Tensor& pred_score, MetaData& meta, cv::Mat& origin_image) {
 	anomaly_map.squeeze_();
 	//cout << anomaly_map.size(0) << " " << anomaly_map.size(1) << endl;	// 512 512
 	
-	//±ê×¼»¯ÈÈÁ¦Í¼ºÍµÃ·Ö
+	//æ ‡å‡†åŒ–çƒ­åŠ›å›¾å’Œå¾—åˆ†
 	anomaly_map = normalize(anomaly_map, meta.pixel_threshold, meta.max, meta.min);
 	pred_score  = normalize(pred_score, meta.image_threshold, meta.max, meta.min);
 	cout << "pred_score:" << pred_score << endl;
@@ -91,32 +90,32 @@ void postProcess(torch::Tensor& anomaly_map, torch::Tensor& pred_score, MetaData
 	ofs << pred_score;
 	ofs.close();
 
-	//ÕâÀïÊµÏÖÁË 0~1 µ½ 0~255
+	//è¿™é‡Œå®ç°äº† 0~1 åˆ° 0~255
 	cv::Mat anomaly_map1(cv::Size(meta.pred_image_size, meta.pred_image_size), CV_8UC1, anomaly_map.data_ptr());
 	anomaly_map1.convertTo(anomaly_map1, CV_8U, 1, 0);
 
-	//¸ßË¹ÂË²¨£¬Ó¦¸Ã·ÅÔÚpost_processÇ°Ãæ£¬ÕâÀï·ÅÔÚÁËºóÃæ£¬ÒòÎªÒªÊ¹ÓÃopencv
+	//é«˜æ–¯æ»¤æ³¢ï¼Œåº”è¯¥æ”¾åœ¨post_processå‰é¢ï¼Œè¿™é‡Œæ”¾åœ¨äº†åé¢ï¼Œå› ä¸ºè¦ä½¿ç”¨opencv
 	cv::Mat res;
-	int sigma = 4;
+	int sigma	    = 4;
 	int kernel_size = 2 * int(4.0 * sigma + 0.5) + 1;
 	cv::GaussianBlur(anomaly_map1, res, { kernel_size, kernel_size }, 4.0, 4.0);
 
-	//»¹Ô­µ½Ô­Í¼³ß´ç
+	//è¿˜åŸåˆ°åŸå›¾å°ºå¯¸
 	cv::Mat res1 = Resize(res, meta.height, meta.width, "bilinear");
 	//cout << res1.rows << ", " << res1.cols << ", " << res1.channels() << endl;	//2711 5351 1
 
-	//anomaly_map = (anomaly_map - anomaly_map.min()) / np.ptp(anomaly_map) np.ptp()º¯ÊıÊµÏÖµÄ¹¦ÄÜµÈÍ¬ÓÚnp.max(array) - np.min(array)
-	//double minValue, maxValue;    // ×î´óÖµ£¬×îĞ¡Öµ
-	//cv::Point  minIdx, maxIdx;    // ×îĞ¡Öµ×ø±ê£¬×î´óÖµ×ø±ê   
+	//anomaly_map = (anomaly_map - anomaly_map.min()) / np.ptp(anomaly_map) np.ptp()å‡½æ•°å®ç°çš„åŠŸèƒ½ç­‰åŒäºnp.max(array) - np.min(array)
+	//double minValue, maxValue;    // æœ€å¤§å€¼ï¼Œæœ€å°å€¼
+	//cv::Point  minIdx, maxIdx;    // æœ€å°å€¼åæ ‡ï¼Œæœ€å¤§å€¼åæ ‡   
 	//cv::minMaxLoc(res1, &minValue, &maxValue, &minIdx, &maxIdx);
 	//res1 = (res1 - minValue) / (maxValue - minValue);
 
-	//µ¥Í¨µÀ×ª»¯Îª3Í¨µÀ
+	//å•é€šé“è½¬åŒ–ä¸º3é€šé“
 	cv::Mat res2;
 	cv::applyColorMap(res1, res2, cv::COLORMAP_JET);
 	//cout << res2.rows << ", " << res2.cols << ", " << res2.channels() << endl;	//2711 5351 3
 
-	//ºÏ²¢Ô­Í¼ºÍÈÈÁ¦Í¼
+	//åˆå¹¶åŸå›¾å’Œçƒ­åŠ›å›¾
 	cv::Mat res3;
 	cv::addWeighted(res2, 0.4, origin_image, 0.6, 0, res3);
 	cv::imwrite("anomaly_map.png", res2);
@@ -125,32 +124,31 @@ void postProcess(torch::Tensor& anomaly_map, torch::Tensor& pred_score, MetaData
 
 
 /**
- * ÍÆÀí
+ * æ¨ç†
  */
-void inference(torch::jit::Module& model, torch::Tensor& x, MetaData& meta, cv::Mat& origin_image) {
-	//ÉèÖÃÊäÈëÖµ£¬»òÕßÖ±½ÓÊ¹ÓÃ {} °ü¹üÊı¾İ
+vector<torch::Tensor> inference(torch::jit::Module& model, torch::Tensor& x) {
+	//è®¾ç½®è¾“å…¥å€¼ï¼Œæˆ–è€…ç›´æ¥ä½¿ç”¨ {} åŒ…è£¹æ•°æ®
 	//vector<torch::jit::IValue> input;
 	//input.push_back(x);
 	//x = torch::randn({ 1, 3, 512, 512 });
-	torch::jit::IValue y = model.forward({ x });
-	//¶à¸ö·µ»ØÖµµÄÌáÈ¡·½Ê½ toTuple() toList()
+	torch::jit::IValue y	  = model.forward({ x });
+	//å¤šä¸ªè¿”å›å€¼çš„æå–æ–¹å¼ toTuple() toList()
 	torch::Tensor anomaly_map = y.toTuple()->elements()[0].toTensor();
 	torch::Tensor pred_score  = y.toTuple()->elements()[1].toTensor();
 	//cout << pred_score << endl;
 
-	//ºó´¦Àí
-	postProcess(anomaly_map, pred_score, meta, origin_image);
+	return vector<torch::Tensor>{anomaly_map, pred_score};
 }
 
 
 int main() {
-	cout << "cudaÊÇ·ñ¿ÉÓÃ£º"  << torch::cuda::is_available() << endl;
-	cout << "cudnnÊÇ·ñ¿ÉÓÃ£º" << torch::cuda::cudnn_is_available() << endl;
+	cout << "cudaæ˜¯å¦å¯ç”¨ï¼š"  << torch::cuda::is_available() << endl;
+	cout << "cudnnæ˜¯å¦å¯ç”¨ï¼š" << torch::cuda::cudnn_is_available() << endl;
 
-	// ¶ÁÈ¡meta
+	// è¯»å–meta
 	auto meta = getJson("D:\\ai\\code\\abnormal\\anomalib\\results\\export\\512-0.1\\param.json");
 
-	//¶ÁÈ¡Í¼Æ¬
+	//è¯»å–å›¾ç‰‡
 	string img_path = "D:\\ai\\code\\abnormal\\anomalib\\datasets\\some\\1.abnormal\\OriginImage_20220526_113038_Cam1_2_crop.jpg";
 	auto image      = readImage(img_path);
 	auto x          = preProcess(image, meta);
@@ -159,12 +157,15 @@ int main() {
 		<< meta.pred_image_size << " " << meta.height << " " << meta.width << endl;
 	// 0.92665 0.92665 0.000141821 1.70372 512 2711 5351
 
-	//¶ÁÈ¡Ä£ĞÍ
+	//è¯»å–æ¨¡å‹
 	string path = "D:\\ai\\code\\abnormal\\anomalib\\results\\export\\512-0.1\\output.torchscript";
 	auto model = loadTorchScript(path);
 
-	//ÍÆÀí
-	inference(model, x, meta, image);
+	//æ¨ç†
+	vector<torch::Tensor> result = inference(model, x);
+	
+	//åå¤„ç†
+	postProcess(result[0], result[1], meta, image);
 
 	return 0;
 }
