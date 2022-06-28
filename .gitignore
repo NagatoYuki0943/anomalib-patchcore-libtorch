@@ -1,0 +1,14 @@
+
+# IDE
+.vscode
+.idea
+.vs
+
+# build
+x64
+
+# pic
+*.jpg
+*.png
+*.jpeg
+*.gif
