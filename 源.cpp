@@ -222,9 +222,8 @@ void predict() {
 	auto result = inference(model, x);
 	//后处理
 	result = postProcess(result[0], result[1], meta);
-	//叠加图片
-	auto kernel_rate = int(meta.height / meta.pred_image_size);
 	//混合原图和热力图
+	auto kernel_rate = int(meta.height / meta.pred_image_size);
 	auto mixed_image = superimposeAnomalyMap(result[0], meta, image, kernel_rate);
 	//分数转化为float
 	auto score = result[1].item<float>();	// at::Tensor -> float
