@@ -34,7 +34,7 @@ vector<cv::String> getImages(string path) {
 
 /**
  * 创建文件夹
- * 
+ *
  *  @param dir	路径
  */
 void createDir(string dir = "./result") {
@@ -45,7 +45,7 @@ void createDir(string dir = "./result") {
 #ifdef WIN32
 		int flag = mkdir(dir.c_str());
 #endif
-#ifdef linux 
+#ifdef linux
 		int flag = mkdir(dir.c_str(), 0777);
 #endif
 		if (flag == 0)
@@ -106,7 +106,7 @@ torch::Tensor preProcess(cv::Mat& image, MetaData& meta) {
 
 /**
  * 读取模型
- * 
+ *
  * @param path	模型路径
  * @return		模型
  */
@@ -177,8 +177,8 @@ cv::Mat cvNormalize(cv::Mat& targets, double threshold, double max_val, double m
  * @return result		热力图和得分vector
  */
 vector<torch::Tensor> postProcess(torch::Tensor& anomaly_map, torch::Tensor& pred_score, MetaData& meta) {
-	//anomaly_map.squeeze_();	
-	
+	//anomaly_map.squeeze_();
+
 	//高斯滤波应该在这里,放到了superimposeAnomalyMap中，增大了kernel size适应更大的图像  TODO:实现卷积完成高斯滤波
 
 	//标准化热力图和得分
@@ -256,7 +256,7 @@ cv::Mat addLabel(cv::Mat& mixed_image, float score, int font = cv::FONT_HERSHEY_
 	int thickness = font_size / 2;
 	cv::Size textsize = cv::getTextSize(text, font, font_size, thickness, &baseline);
 	//cout << textsize << endl;	//[1627 x 65]
-	
+
 	//背景
 	cv::rectangle(mixed_image, cv::Point(0, 0), cv::Point(textsize.width+10, textsize.height+10), Scalar(225, 252, 134), FILLED);
 
@@ -269,7 +269,7 @@ cv::Mat addLabel(cv::Mat& mixed_image, float score, int font = cv::FONT_HERSHEY_
 
 
 /**
- * 保存图片和分数 
+ * 保存图片和分数
  *
  * @param score		得分
  * @param mixed_image_with_label 混合后的图片
@@ -293,7 +293,7 @@ void save(float score, cv::Mat& mixed_image_with_label, cv::String img_path) {
 
 
 /**
- * 预测过程 
+ * 预测过程
  *
  * @param img_list   图片列表
  * @param model_path 模型路径
@@ -341,7 +341,7 @@ void predict(vector<cv::String> img_list, string model_path, string meta_path) {
 		//auto score = result[1].item().toFloat();
 		//添加标签
 		auto mixed_image_with_label = addLabel(mixed_image, score);
-		//保存图片和分数 
+		//保存图片和分数
 		save(score, mixed_image_with_label, img_path);
 	}
 }
@@ -366,9 +366,9 @@ void testCuda() {
 int main() {
 	//testCuda();
 	auto imagedir = "D:/ai/code/abnormal/anomalib/datasets/some/1.abnormal";
-	auto model_path = "D:/ai/code/abnormal/anomalib/results/export/512-0.1/output.torchscript"; //模型可以使用cpu和cuda导出版本，都能在cuda上使用
-	auto meta_path = "D:/ai/code/abnormal/anomalib/results/export/512-0.1/param.json";
-	
+	auto model_path = "./weights/512-0.1/output.torchscript"; //模型可以使用cpu和cuda导出版本，都能在cuda上使用
+	auto meta_path = "./weights/512-0.1/param.json";
+
 	auto image_list = getImages(imagedir);
 
 	predict(image_list, model_path, meta_path);

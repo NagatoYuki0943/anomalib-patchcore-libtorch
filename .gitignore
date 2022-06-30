@@ -16,6 +16,9 @@ x64
 # result
 result/*
 
+# weights
+weights/*
+
 # model
 *.pt
 *.pth

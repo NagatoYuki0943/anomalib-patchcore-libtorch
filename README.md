@@ -137,3 +137,14 @@ XNNPACK.lib;
 >
 > 设置图片文件夹路径`imagedir`, 模型路径`model_path`和超参数路径`meta_path`进行推理.
 
+# 问题
+
+> anomalib中热力图的高斯模糊是在热力图和分数的标准化和放大热力图之前，使用的基于pytorch的conv2d，这里在放大图像之后，并且使用的opencv自带的高斯滤波，因为图片分辨率提高也因此增大了kernel_size，不过效果仍然没有python版本绘制的效果好
+
+
+
+# opencv函数参考了mmdeploy的代码
+
+`opencv_utils.cpp opencv_utils.h`
+
+https://github.com/open-mmlab/mmdeploy/tree/master/csrc/mmdeploy/utils/opencv
