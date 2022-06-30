@@ -13,4 +13,13 @@ x64
 *.jpeg
 *.gif
 
+# result
 result.txt
+
+# model
+*.pt
+*.pth
+*.pkl
+*.ckpt
+*.onnx
+*.torchscript

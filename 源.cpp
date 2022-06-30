@@ -7,6 +7,8 @@
 #include<vector>
 #include"opencv_utils.h"
 #include"utils.h"
+#include <Windows.h>
+
 using namespace cv;
 using namespace std;
 
@@ -15,8 +17,7 @@ using namespace std;
  * 读取图像并预处理
  */
 cv::Mat readImage(String path) {
-	cv::Mat image = cv::imread(path);				// BGR
-	return image;
+	return cv::imread(path);				// BGR
 }
 
 
@@ -53,8 +54,8 @@ torch::Tensor preProcess(cv::Mat& image, MetaData& meta) {
 /**
  * 读取模型
  */
-torch::jit::Module loadTorchScript(String path) {
-	return torch::jit::load(path);
+torch::jit::script::Module loadTorchScript(String path) {
+	return torch::jit::load(path);;
 }
 
 
@@ -66,7 +67,7 @@ vector<torch::Tensor> inference(torch::jit::Module& model, torch::Tensor& x) {
 	//vector<torch::jit::IValue> input;
 	//input.push_back(x);
 	//x = torch::randn({ 1, 3, 512, 512 });
-	torch::jit::IValue y = model.forward({ x });
+	auto y = model.forward({ x });
 	//多个返回值的提取方式 toTuple() toList()
 	torch::Tensor anomaly_map = y.toTuple()->elements()[0].toTensor();
 	torch::Tensor pred_score = y.toTuple()->elements()[1].toTensor();
@@ -125,6 +126,7 @@ vector<torch::Tensor> postProcess(torch::Tensor& anomaly_map, torch::Tensor& pre
  * 叠加图片
  */
 cv::Mat superimposeAnomalyMap(torch::Tensor& anomaly_map, MetaData& meta, cv::Mat& origin_image, int kernel_rate) {
+	anomaly_map = anomaly_map.to(torch::kCPU);	//转移到CPU，不然报错
 	cv::Mat anomaly(cv::Size(meta.width, meta.height), CV_32F, anomaly_map.data_ptr());
 	cout << anomaly.rows << ", " << anomaly.cols << ", " << anomaly.channels() << endl;
 
@@ -200,14 +202,18 @@ void save(float score, cv::Mat& mixed_image_with_label) {
  * 预测过程 
  */
 void predict() {
-	cout << "cuda is_available:" << torch::cuda::is_available() << endl;
-	cout << "cudnn cudnn_is_available:" << torch::cuda::cudnn_is_available() << endl;
-
-	auto path = "D:\\ai\\code\\abnormal\\anomalib\\results\\export\\512-0.1\\output.torchscript";
 	auto img_path = "D:\\ai\\code\\abnormal\\anomalib\\datasets\\some\\1.abnormal\\OriginImage_20220526_113206_Cam1_6_crop.jpg";
+	auto model_path = "D:\\ai\\code\\abnormal\\anomalib\\results\\export\\512-0.1\\output.torchscript"; //模型可以使用cpu和cuda导出版本，都能在cuda上使用
+	auto meta_path = "D:\\ai\\code\\abnormal\\anomalib\\results\\export\\512-0.1\\param.json";
+
+
+	//要在链接器命令行中添加 "/INCLUDE:?warp_size@cuda@at@@YAHXZ /INCLUDE:?_torch_cuda_cu_linker_symbol_op_cuda@native@at@@YA?AVTensor@2@AEBV32@@Z "
+	//refer https://github.com/pytorch/pytorch/issues/72396
+	auto cuda = torch::cuda::is_available();
+	if (cuda) cout << "cuda" << endl;
 
 	//读取meta
-	auto meta = getJson("D:\\ai\\code\\abnormal\\anomalib\\results\\export\\512-0.1\\param.json");
+	auto meta = getJson(meta_path);
 	cout << meta.image_threshold << " " << meta.pixel_threshold << " " << meta.min << " " << meta.max << " "
 		<< meta.pred_image_size << " " << meta.height << " " << meta.width << endl;
 	// 0.92665 0.92665 0.000141821 1.70372 512 2711 5351
@@ -217,7 +223,12 @@ void predict() {
 	//图片预处理
 	auto x = preProcess(image, meta);
 	//读取模型
-	auto model = loadTorchScript(path);
+	auto model = loadTorchScript(model_path);
+	//使用cuda
+	if (cuda) {
+		model.to(torch::kCUDA);
+		x = x.to(torch::kCUDA);
+	}
 	//推理
 	auto result = inference(model, x);
 	//后处理
@@ -227,6 +238,7 @@ void predict() {
 	auto mixed_image = superimposeAnomalyMap(result[0], meta, image, kernel_rate);
 	//分数转化为float
 	auto score = result[1].item<float>();	// at::Tensor -> float
+	//auto score = result[1].item().toFloat();
 	//添加标签
 	auto mixed_image_with_label = addLabel(mixed_image, score);
 	//保存图片和分数 
@@ -234,7 +246,24 @@ void predict() {
 }
 
 
+/**
+ * 测试cuda是否可以使用
+ */
+void testCuda() {
+	LoadLibraryA("torch_cuda.dll");
+	try {
+		std::cout << torch::cuda::is_available() << std::endl;
+		torch::Tensor tensor = torch::tensor({ -1, 1 }, torch::kCUDA);
+		cout << tensor << endl;
+	}
+	catch (exception& ex) {
+		std::cout << ex.what() << std::endl;
+	}
+}
+
+
 int main() {
+	//testCuda();
 	predict();
 
 	return 0;

@@ -1,0 +1,7 @@
+/INCLUDE:?warp_size@cuda@at@@YAHXZ /INCLUDE:?_torch_cuda_cu_linker_symbol_op_cuda@native@at@@YA?
+
+AVTensor@2@AEBV32@@Z
+/INCLUDE:?warp_size@cuda@at@@YAHXZ
+/INCLUDE:"?ignore_this_library_placeholder@@YAHXZ
+/INCLUDE:?searchsorted_cuda@native@at@@YA?AVTensor@2@AEBV32@0_N1@Z
+
