@@ -191,7 +191,7 @@ vector<torch::Tensor> postProcess(torch::Tensor& anomaly_map, torch::Tensor& pre
 		torch::nn::functional::InterpolateFuncOptions().size(vector<int64_t>{meta.height, meta.width})
 		.mode(torch::kBilinear).align_corners(true));
 
-	anomaly_map.squeeze_();	// 1,1,512,512 -> 512,512
+	anomaly_map.squeeze_();
 	//cout << anomaly_map.size(0) << ", " << anomaly_map.size(1) << endl; //2711, 5351
 
 	return vector<torch::Tensor>{anomaly_map, pred_score};
