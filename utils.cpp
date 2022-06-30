@@ -8,7 +8,7 @@ MetaData getJson(std::string json_path) {
     //    std::cerr << "File does not exists!" << std::endl;
     //    return 0;
     //}
-    char readBuffer[60000];
+    char readBuffer[1000];
     rapidjson::FileReadStream is(fp, readBuffer, sizeof(readBuffer));
     rapidjson::Document doc;
     doc.ParseStream(is);
