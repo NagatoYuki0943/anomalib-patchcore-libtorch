@@ -14,7 +14,7 @@ x64
 *.gif
 
 # result
-result.txt
+result/*
 
 # model
 *.pt

@@ -8,24 +8,77 @@
 #include"opencv_utils.h"
 #include"utils.h"
 #include <Windows.h>
+#include <direct.h>
+#include<io.h>
 
 using namespace cv;
 using namespace std;
 
 
-/**
- * 读取图像并预处理
+/*
+ * 获取文件夹下全部图片的绝对路径
+ *
+ * @param path		    图片文件夹路径
+ * @return result		全部图片绝对路径列表
  */
-cv::Mat readImage(String path) {
+vector<cv::String> getImages(string path) {
+	vector<cv::String> result;
+	cv::glob(path, result, false);
+	//for (auto name : result) {
+	//	cout << name << endl;
+	//}
+	//D:/ai/code/abnormal/anomalib/datasets/some/1.abnormal\OriginImage_20220526_113441_Cam1_47_crop.jpg
+	return result;
+}
+
+
+/**
+ * 创建文件夹
+ * 
+ *  @param dir	路径
+ */
+void createDir(string dir = "./result") {
+	if (access(dir.c_str(), 0) == -1)
+	{
+		cout << dir << " is not existing" << endl;
+		cout << "now make it" << endl;
+#ifdef WIN32
+		int flag = mkdir(dir.c_str());
+#endif
+#ifdef linux 
+		int flag = mkdir(dir.c_str(), 0777);
+#endif
+		if (flag == 0)
+		{
+			cout << "make successfully" << endl;
+		}
+		else {
+			cout << "make errorly" << endl;
+		}
+	}
+}
+
+
+/**
+ * 读取图像
+ *
+ * @param path	图片路径
+ * @return		图片
+ */
+cv::Mat readImage(string path) {
 	return cv::imread(path);				// BGR
 }
 
 
 /**
  * 图片预处理
+ *
+ * @param path	图片路径
+ * @param meta  超参数,这里存放原图的宽高
+ * @return x	tensor类型的图片
  */
 torch::Tensor preProcess(cv::Mat& image, MetaData& meta) {
-	//保存原图信息
+	//保存原图宽高
 	meta.height = image.rows;
 	meta.width = image.cols;
 
@@ -53,6 +106,9 @@ torch::Tensor preProcess(cv::Mat& image, MetaData& meta) {
 
 /**
  * 读取模型
+ * 
+ * @param path	模型路径
+ * @return		模型
  */
 torch::jit::script::Module loadTorchScript(String path) {
 	return torch::jit::load(path);;
@@ -61,6 +117,10 @@ torch::jit::script::Module loadTorchScript(String path) {
 
 /**
  * 推理
+ *
+ * @param model		热力图或者得分
+ * @param x			阈值,meta中的参数
+ * @return			热力图和得分
  */
 vector<torch::Tensor> inference(torch::jit::Module& model, torch::Tensor& x) {
 	//设置输入值，或者直接使用 {} 包裹数据
@@ -79,6 +139,12 @@ vector<torch::Tensor> inference(torch::jit::Module& model, torch::Tensor& x) {
 
 /**
  * 分别标准化热力图和得分
+ *
+ * @param targets		热力图或者得分
+ * @param threshold		阈值,meta中的参数
+ * @param max_val		最大值,meta中的参数
+ * @param min_val		最小值,meta中的参数
+ * @return normalized	经过标准化后的结果
  */
 torch::Tensor normalize(torch::Tensor& targets, double threshold, double max_val, double min_val) {
 	auto normalized = ((targets - threshold) / (max_val - min_val)) + 0.5;
@@ -90,6 +156,12 @@ torch::Tensor normalize(torch::Tensor& targets, double threshold, double max_val
 
 /**
  * opencv标准化热力图
+ *
+ * @param targets		热力图
+ * @param threshold		阈值,meta中的参数
+ * @param max_val		最大值,meta中的参数
+ * @param min_val		最小值,meta中的参数
+ * @return normalized	经过标准化后的结果
  */
 cv::Mat cvNormalize(cv::Mat& targets, double threshold, double max_val, double min_val) {
 	auto normalized = ((targets - threshold) / (max_val - min_val)) + 0.5;
@@ -98,12 +170,16 @@ cv::Mat cvNormalize(cv::Mat& targets, double threshold, double max_val, double m
 
 
 /**
- * 后处理部分
+ * 后处理部分,标准化热力图和得分,还原热力图到原图尺寸
+ *
+ * @param anomaly_map   未经过标准化的热力图
+ * @param pred_score    未经过标准化的得分
+ * @return result		热力图和得分vector
  */
 vector<torch::Tensor> postProcess(torch::Tensor& anomaly_map, torch::Tensor& pred_score, MetaData& meta) {
 	//anomaly_map.squeeze_();	
 	
-	//高斯滤波应该在这里,放到了superimposeAnomalyMap中，增大了kernel size适应更大的图像
+	//高斯滤波应该在这里,放到了superimposeAnomalyMap中，增大了kernel size适应更大的图像  TODO:实现卷积完成高斯滤波
 
 	//标准化热力图和得分
 	anomaly_map = normalize(anomaly_map, meta.pixel_threshold, meta.max, meta.min);
@@ -124,13 +200,19 @@ vector<torch::Tensor> postProcess(torch::Tensor& anomaly_map, torch::Tensor& pre
 
 /**
  * 叠加图片
+ *
+ * @param anomaly_map   混合后的图片
+ * @param meta	        超参数
+ * @param origin_image  原始图片
+ * @param kernel_rate	高斯滤波kernel_size缩放比例
+ * @return result		叠加后的图像
  */
 cv::Mat superimposeAnomalyMap(torch::Tensor& anomaly_map, MetaData& meta, cv::Mat& origin_image, int kernel_rate) {
 	anomaly_map = anomaly_map.to(torch::kCPU);	//转移到CPU，不然报错
 	cv::Mat anomaly(cv::Size(meta.width, meta.height), CV_32F, anomaly_map.data_ptr());
-	cout << anomaly.rows << ", " << anomaly.cols << ", " << anomaly.channels() << endl;
+	//cout << anomaly.rows << ", " << anomaly.cols << ", " << anomaly.channels() << endl;
 
-	//高斯滤波，应该放在post_process前面，这里放在了后面，因为要使用opencv 增大了kernel size适应更大的图像
+	//高斯滤波，应该放在post_process前面，这里放在了后面，因为要使用opencv 增大了kernel size适应更大的图像,效果仍然比放在前面效果差,因为之前实在缩小的图像处理的
 	int sigma = int(4 * kernel_rate);
 	int kernel_size = 2 * int(4.0 * sigma + 0.5) + 1;
 	cv::GaussianBlur(anomaly, anomaly, { kernel_size, kernel_size }, sigma, sigma);
@@ -155,14 +237,17 @@ cv::Mat superimposeAnomalyMap(torch::Tensor& anomaly_map, MetaData& meta, cv::Ma
 	cv::Mat result;
 	cv::addWeighted(anomaly, 0.4, origin_image, 0.6, 0, result);
 
-	//cv::imwrite("anomaly_map.png", anomaly);
-	//cv::imwrite("result.png", result);
 	return result;
 }
 
 
 /**
  * 给图片添加标签
+ *
+ * @param mixed_image   混合后的图片
+ * @param score			得分
+ * @param font			字体
+ * @return mixed_image  添加标签的图像
  */
 cv::Mat addLabel(cv::Mat& mixed_image, float score, int font = cv::FONT_HERSHEY_PLAIN) {
 	string text = "Confidence Score " + to_string(score);
@@ -185,30 +270,38 @@ cv::Mat addLabel(cv::Mat& mixed_image, float score, int font = cv::FONT_HERSHEY_
 
 /**
  * 保存图片和分数 
+ *
+ * @param score		得分
+ * @param mixed_image_with_label 混合后的图片
+ * @param img_path  输入图片的路径
  */
-void save(float score, cv::Mat& mixed_image_with_label) {
+void save(float score, cv::Mat& mixed_image_with_label, cv::String img_path) {
+	auto start = img_path.rfind("\\");
+	auto end = img_path.substr(start + 1).rfind(".");
+	//cout << start << ", " << end << endl;	//53, 39
+	auto image_name = img_path.substr(start+1).substr(0, end);  //OriginImage_20220526_113036_Cam1_1_crop
+
 	//打印并保存得分
-	cout << "pred_score:" << score << endl;
+	cout << "pred_score: " << score << endl;
 	ofstream ofs;
-	ofs.open("result.txt", ios::out);
+	ofs.open("result/" + image_name + ".txt", ios::out);
 	ofs << score;
 	ofs.close();
 
-	cv::imwrite("result.jpg", mixed_image_with_label);
+	cv::imwrite("result/" + image_name + ".jpg", mixed_image_with_label);
 }
 
 
 /**
  * 预测过程 
+ *
+ * @param img_list   图片列表
+ * @param model_path 模型路径
+ * @param meta_path  模型超参数路径
  */
-void predict() {
-	auto img_path = "D:\\ai\\code\\abnormal\\anomalib\\datasets\\some\\1.abnormal\\OriginImage_20220526_113206_Cam1_6_crop.jpg";
-	auto model_path = "D:\\ai\\code\\abnormal\\anomalib\\results\\export\\512-0.1\\output.torchscript"; //模型可以使用cpu和cuda导出版本，都能在cuda上使用
-	auto meta_path = "D:\\ai\\code\\abnormal\\anomalib\\results\\export\\512-0.1\\param.json";
-
-
+void predict(vector<cv::String> img_list, string model_path, string meta_path) {
 	//要在链接器命令行中添加 "/INCLUDE:?warp_size@cuda@at@@YAHXZ /INCLUDE:?_torch_cuda_cu_linker_symbol_op_cuda@native@at@@YA?AVTensor@2@AEBV32@@Z "
-	//refer https://github.com/pytorch/pytorch/issues/72396
+	//refer https://github.com/pytorch/pytorch/issues/72396#issuecomment-1032712081
 	auto cuda = torch::cuda::is_available();
 	if (cuda) cout << "cuda" << endl;
 
@@ -217,32 +310,40 @@ void predict() {
 	cout << meta.image_threshold << " " << meta.pixel_threshold << " " << meta.min << " " << meta.max << " "
 		<< meta.pred_image_size << " " << meta.height << " " << meta.width << endl;
 	// 0.92665 0.92665 0.000141821 1.70372 512 2711 5351
-
-	//读取图片
-	auto image = readImage(img_path);
-	//图片预处理
-	auto x = preProcess(image, meta);
 	//读取模型
 	auto model = loadTorchScript(model_path);
-	//使用cuda
 	if (cuda) {
 		model.to(torch::kCUDA);
-		x = x.to(torch::kCUDA);
 	}
-	//推理
-	auto result = inference(model, x);
-	//后处理
-	result = postProcess(result[0], result[1], meta);
-	//混合原图和热力图
-	auto kernel_rate = int(meta.height / meta.pred_image_size);
-	auto mixed_image = superimposeAnomalyMap(result[0], meta, image, kernel_rate);
-	//分数转化为float
-	auto score = result[1].item<float>();	// at::Tensor -> float
-	//auto score = result[1].item().toFloat();
-	//添加标签
-	auto mixed_image_with_label = addLabel(mixed_image, score);
-	//保存图片和分数 
-	save(score, mixed_image_with_label);
+
+	//创建存储结果的文件夹
+	createDir("./result");
+
+	//循环图片列表
+	for (auto img_path : img_list) {
+		//读取图片
+		auto image = readImage(img_path);
+		//图片预处理
+		auto x = preProcess(image, meta);
+		//使用cuda
+		if (cuda) {
+			x = x.to(torch::kCUDA);
+		}
+		//推理
+		auto result = inference(model, x);
+		//后处理
+		result = postProcess(result[0], result[1], meta);
+		//混合原图和热力图
+		auto kernel_rate = int(meta.height / meta.pred_image_size);
+		auto mixed_image = superimposeAnomalyMap(result[0], meta, image, kernel_rate);
+		//分数转化为float
+		auto score = result[1].item<float>();	// at::Tensor -> float
+		//auto score = result[1].item().toFloat();
+		//添加标签
+		auto mixed_image_with_label = addLabel(mixed_image, score);
+		//保存图片和分数 
+		save(score, mixed_image_with_label, img_path);
+	}
 }
 
 
@@ -264,7 +365,13 @@ void testCuda() {
 
 int main() {
 	//testCuda();
-	predict();
+	auto imagedir = "D:/ai/code/abnormal/anomalib/datasets/some/1.abnormal";
+	auto model_path = "D:/ai/code/abnormal/anomalib/results/export/512-0.1/output.torchscript"; //模型可以使用cpu和cuda导出版本，都能在cuda上使用
+	auto meta_path = "D:/ai/code/abnormal/anomalib/results/export/512-0.1/param.json";
+	
+	auto image_list = getImages(imagedir);
+
+	predict(image_list, model_path, meta_path);
 
 	return 0;
 }
