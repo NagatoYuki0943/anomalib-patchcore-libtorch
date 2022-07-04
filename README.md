@@ -26,10 +26,15 @@
 
 > `{opencv}`要替换为自己的对应的目录
 
-```
+```shell
 {opencv}\build\x64\vc15\bin
 {opencv}\build\x64\vc15\lib
 {libtorch}\lib
+
+# example
+D:\AI\opencv\build\x64\vc15\bin
+D:\AI\opencv\build\x64\vc15\lib
+D:\AI\libtorch\lib
 ```
 
 > 注意：cuda和cudnn的环境变量在安装时就自动写入，这里不需要手动添加。
@@ -48,12 +53,19 @@
 
 > 附加包含目录添加如下
 
-```
-{rapidjson}\include;
-{opencv}build\include\opencv2;
-{opencv}build\include;
-{libtorch}\include;
-{libtorch}\include\torch\csrc\api\include;
+```shell
+{rapidjson}\include
+{opencv}\build\include\opencv2
+{opencv}\build\include
+{libtorch}\include
+{libtorch}\include\torch\csrc\api\include
+
+# example
+D:\AI\rapidjson\include
+D:\AI\opencv\build\include\opencv2
+D:\AI\opencv\build\include
+D:\AI\libtorch\include
+D:\AI\libtorch\include\torch\csrc\api\include
 ```
 
 > SDL检查 `否`
@@ -70,9 +82,13 @@
 
 > 附加库目录
 
-```
-{opencv}build\x64\vc15\lib;
+```shell
+{opencv}\build\x64\vc15\lib
 {libtorch}\lib
+
+# example
+D:\AI\opencv\build\x64\vc15\lib
+D:\AI\libtorch\lib
 ```
 
 #### 输入
@@ -81,13 +97,16 @@
 >
 > 注意如果是Debug模式要将 `opencv_world455.lib` 更改为 `opencv_world455d.lib`,libtorch的Debug版本也有些许不同
 
-```
-opencv_world455.lib;
+```shell
+# release
+opencv_world460.lib
+# debug
+opencv_world460d.lib
 ```
 
 `{libtorch}\lib`目录下所有的lib
 
-```
+```shell
 asmjit.lib;
 c10.lib;
 c10_cuda.lib;
