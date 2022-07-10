@@ -223,8 +223,9 @@ cv::Mat superimposeAnomalyMap(torch::Tensor& anomaly_map, MetaData& meta, cv::Ma
     anomaly = (anomaly - minValue) / (maxValue - minValue);
 
     //转换为整形
-    anomaly = anomaly * 255;
-    anomaly.convertTo(anomaly, CV_8U);
+    //anomaly = anomaly * 255;
+    //anomaly.convertTo(anomaly, CV_8U);
+    cv::normalize(anomaly, anomaly, 0, 255, cv::NormTypes::NORM_MINMAX, CV_8U);
 
     //单通道转化为3通道
     cv::applyColorMap(anomaly, anomaly, cv::COLORMAP_JET);
