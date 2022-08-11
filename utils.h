@@ -15,7 +15,8 @@ public:
     double pixel_threshold;
     double min;
     double max;
-    int pred_image_size;
+    int pred_image_height;
+    int pred_image_width;
     int height;
     int width;
 };

@@ -18,7 +18,8 @@ MetaData getJson(std::string json_path) {
     double pixel_threshold = doc["pixel_threshold"].GetDouble();
     double min             = doc["min"].GetDouble();
     double max             = doc["max"].GetDouble();
-    int pred_image_size    = doc["pred_image_size"].GetInt();
+    int pred_image_height  = doc["pred_image_height"].GetInt();
+    int pred_image_width   = doc["pred_image_width"].GetInt();
 
 	//std::cout << image_threshold << std::endl;
 	//std::cout << pixel_threshold << std::endl;
@@ -31,7 +32,8 @@ MetaData getJson(std::string json_path) {
     meta.pixel_threshold = pixel_threshold;
     meta.min = min;
     meta.max = max;
-    meta.pred_image_size = pred_image_size;
+    meta.pred_image_height = pred_image_height;
+    meta.pred_image_width  = pred_image_width;
 
     return meta;
 }

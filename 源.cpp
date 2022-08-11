@@ -86,7 +86,7 @@ torch::Tensor preProcess(cv::Mat& image, MetaData& meta) {
     cv::cvtColor(image, image, cv::COLOR_BGR2RGB);	// BGR2RGB
 
     //缩放
-    cv::Mat res = Resize(image, meta.pred_image_size, meta.pred_image_size, "bilinear");
+    cv::Mat res = Resize(image, meta.pred_image_height, meta.pred_image_width, "bilinear");
 
     //归一化
     res = Divide(res);
@@ -305,12 +305,18 @@ void predict(vector<cv::String>& img_list, string& model_path, string& meta_path
     //要在链接器命令行中添加 "/INCLUDE:?warp_size@cuda@at@@YAHXZ /INCLUDE:?_torch_cuda_cu_linker_symbol_op_cuda@native@at@@YA?AVTensor@2@AEBV32@@Z "
     //refer https://github.com/pytorch/pytorch/issues/72396#issuecomment-1032712081
     auto cuda = torch::cuda::is_available();
-    if (cuda) cout << "cuda" << endl;
+
+    if (cuda) {
+        cout << "cuda inference" << endl;
+    }
+    else {
+        cout << "cpu inference" << endl;
+    }
 
     //读取meta
     auto meta = getJson(std::move(meta_path));
     cout << meta.image_threshold << " " << meta.pixel_threshold << " " << meta.min << " " << meta.max << " "
-        << meta.pred_image_size << " " << meta.height << " " << meta.width << endl;
+        << meta.pred_image_height << " " << meta.pred_image_width << " " << meta.height << " " << meta.width << endl;
     // 0.92665 0.92665 0.000141821 1.70372 512 2711 5351
     //读取模型
     auto model = loadTorchScript(model_path);
@@ -336,7 +342,7 @@ void predict(vector<cv::String>& img_list, string& model_path, string& meta_path
         //后处理
         result = postProcess(result[0], result[1], meta);
         //混合原图和热力图
-        auto kernel_rate = int(meta.height / meta.pred_image_size);
+        auto kernel_rate = int(meta.height / (meta.pred_image_height + meta.pred_image_width) * 2);
         auto mixed_image = superimposeAnomalyMap(result[0], meta, image, kernel_rate);
         //分数转化为float
         auto score = result[1].item<float>();	// at::Tensor -> float
@@ -367,10 +373,11 @@ void testCuda() {
 
 int main() {
 	//testCuda();
-	string imagedir = "D:/ai/code/abnormal/anomalib/datasets/some/1.abnormal";
-    string model_path = "./weights/512-0.1/output.torchscript"; //模型可以使用cpu和cuda导出版本，都能在cuda上使用
-    string meta_path = "./weights/512-0.1/param.json";
-    string save_dir = "./result";
+	string imagedir   = "D:/ai/code/abnormal/anomalib/datasets/some/1.abnormal";
+    //使用cpu设备导出的模型既能使用cpu也能使用cuda推理,而使用cuda导出的模型只能使用cuda推理
+    string model_path = "./weights/512-0.1/output.torchscript";
+    string meta_path  = "./weights/512-0.1/param.json";
+    string save_dir   = "./result";
 
     auto image_list = getImages(imagedir);
 
