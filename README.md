@@ -1,16 +1,12 @@
 # 说明
 
-> 建议使用onnxruntime和openvino推理
+> 建议使用onnxruntime,openvino和tensorrt推理
 > 
-> https://github.com/NagatoYuki0943/anomalib-onnxruntime-cpp
-> 
-> https://github.com/NagatoYuki0943/anomalib-openvino-cpp
-
-> anomalib patchcore 的 torchscript C++推理
+> [anomalib-onnxruntime-cpp](https://github.com/NagatoYuki0943/anomalib-onnxruntime-cpp)
 >
-> 对应版本 pytorch-1.11_cu113 libtorch-1.11_cu113 cuda113
-
-
+> [anomalib-openvino-cpp](https://github.com/NagatoYuki0943/anomalib-openvino-cpp)
+>
+> [anomalib-tensorrt-cpp](https://github.com/NagatoYuki0943/anomalib-tensorrt-cpp)
 
 # anomalib地址
 
